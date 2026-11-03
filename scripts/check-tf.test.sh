@@ -568,6 +568,10 @@ esperar 1 "ferramenta-mista"
 
 novo mista-lock-terraform-workflow-opentofu; raiz_tf envs/prd
 f .github/workflows/ci.yml <<'FIX'
+on: workflow_dispatch
+concurrency:
+  group: x
+  cancel-in-progress: true
 jobs:
   x:
     steps:
@@ -577,6 +581,10 @@ esperar 1 "ferramenta-mista"
 
 novo workflow-parametrizado-terraform; raiz_tf envs/prd
 f .github/workflows/ci.yml <<'FIX'
+on: workflow_dispatch
+concurrency:
+  group: x
+  cancel-in-progress: true
 env:
   TF_TOOL: terraform
 jobs:
@@ -591,6 +599,10 @@ esperar 0 "no piso"
 
 novo workflow-comentario-nao-conta; raiz_boa envs/prd
 f .github/workflows/ci.yml <<'FIX'
+on: workflow_dispatch
+concurrency:
+  group: x
+  cancel-in-progress: true
 # para Terraform troque por hashicorp/setup-terraform e rode terraform init
 jobs:
   x:
@@ -616,6 +628,79 @@ f envs/prd/ferramenta.tf <<'FIX'
 # tf-ok: lock-ausente lock será gerado no primeiro init (caso de teste)
 FIX
 esperar 0 "ferramenta-indefinida"
+
+echo "== gatilhos do CI (piso 27) =="
+WF_OK='on:
+  workflow_dispatch:
+  push:
+    tags: ["hml-*", "v*"]
+concurrency:
+  group: x
+  cancel-in-progress: true
+jobs:
+  x:
+    steps:
+      - uses: opentofu/setup-opentofu@abc'
+novo ci-push-branch-reprova; raiz_boa envs/prd
+f .github/workflows/terraform.yml <<FIX
+on:
+  push:
+    branches: [main]
+concurrency:
+  group: x
+  cancel-in-progress: true
+jobs:
+  x:
+    steps:
+      - uses: opentofu/setup-opentofu@abc
+FIX
+esperar 1 "ci-gatilho"
+novo ci-pull-request-reprova; raiz_boa envs/prd
+f .github/workflows/terraform.yml <<FIX
+on:
+  pull_request:
+    paths: ["envs/**"]
+  workflow_dispatch:
+concurrency:
+  group: x
+  cancel-in-progress: true
+jobs:
+  x:
+    steps:
+      - uses: opentofu/setup-opentofu@abc
+FIX
+esperar 1 "ci-gatilho"
+novo ci-cron-sem-justificativa-reprova; raiz_boa envs/prd
+f .github/workflows/drift.yml <<FIX
+on:
+  schedule:
+    - cron: "17 6 * * *"
+concurrency:
+  group: x
+  cancel-in-progress: true
+jobs:
+  x:
+    steps:
+      - uses: opentofu/setup-opentofu@abc
+FIX
+esperar 1 "ci-gatilho"
+novo ci-sem-concurrency-reprova; raiz_boa envs/prd
+f .github/workflows/terraform.yml <<'FIX'
+on: workflow_dispatch
+jobs:
+  x:
+    steps:
+      - uses: opentofu/setup-opentofu@abc
+FIX
+esperar 1 "ci-gatilho"
+novo ci-dispatch-e-tags-passa; raiz_boa envs/prd
+printf '%s\n' "$WF_OK" | f .github/workflows/terraform.yml
+esperar 0 "no piso"
+for t in github-actions-terraform github-actions-drift; do
+  novo "template-$t-passa"; raiz_boa envs/prd
+  mkdir -p "$D/.github/workflows"; cp "$AQUI/../assets/ci/$t.yml" "$D/.github/workflows/$t.yml"
+  esperar 0 "no piso"
+done
 
 echo
 echo "check-tf.test: $ok ok, $fail falha(s)"

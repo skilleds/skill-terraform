@@ -18,7 +18,7 @@
 #   tofu-criptografia-sem-enforced · terraform-state-sem-kms · backend-ausente · backend-local · required-version · provider-sem-pin ·
 #   provider-sem-teto · lock-ausente · lock-sem-multiplataforma · segredo-literal ·
 #   state-versionado · critico-sem-prevent-destroy · provider-em-modulo · variavel-sensivel ·
-#   output-sensivel.
+#   output-sensivel · ci-gatilho (delega ao check-ci-triggers.sh: push de branch, pull_request, cron sem justificativa, sem concurrency cancel true).
 # Ramo OpenTofu: raiz com backend exige terraform { encryption { ... state { enforced = true } } }.
 # Ramo Terraform: backend s3 exige encrypt = true + kms_key_id; gcs exige kms_encryption_key.
 # Waiver rastreável: `# tf-ok: <motivo>` na linha ou na de cima (regras de linha/bloco);
@@ -224,6 +224,22 @@ for wd in $WFD; do
       if grep -qE 'setup-terraform|(^|[^A-Za-z0-9_-])terraform[[:space:]]+(init|plan|apply|validate|fmt|test|show|providers)' <<<"$txt"; then EV_TF+=("$wf (workflow usa terraform)"); fi
     fi
   done
+done
+
+# --- gatilhos do CI (piso 27): workflow não roda por commit/PR, nem aplica em push de branch -----------
+# Delega ao check-ci-triggers.sh (cópia herdada da engineering, ao lado deste script). Cada FAIL vira ERRO.
+CITRIG="$(dirname "${BASH_SOURCE[0]}")/check-ci-triggers.sh"
+for wd in $WFD; do
+  [ -d "$wd" ] || continue
+  if [ ! -f "$CITRIG" ]; then
+    emit "$wd" 1 AVISO ci-gatilho "check-ci-triggers.sh ausente ao lado do gate: gatilhos do CI não verificados (piso 27)"
+    break
+  fi
+  while IFS= read -r l; do
+    case "$l" in
+      *": FAIL: "*) emit "${l%%: FAIL: *}" 1 ERRO ci-gatilho "${l#*: FAIL: }" ;;
+    esac
+  done < <(bash "$CITRIG" "$wd" 2>&1 || true)
 done
 
 FERR=""

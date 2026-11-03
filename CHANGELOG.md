@@ -3,6 +3,19 @@
 Todas as mudanças relevantes deste pacote, no formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 com versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
+## [Não lançado]
+
+### Corrigido
+- CI de IaC (piso 27): `assets/ci/github-actions-terraform.yml` deixa de usar `pull_request` e `push` em branch; gatilho `workflow_dispatch` + `push: tags [hml-*, v*]`, `concurrency` com `cancel-in-progress: true` (apply com concurrency próprio por ambiente, `false` justificado), `apply-hml`/`apply-prd` só atrás de `environment` com aprovação, nunca em push de branch. Job `alvo` resolve o ambiente pela tag/input sem interpolar no shell.
+- Plan revisado = plan aplicado: o apply baixa o artefato do plan da mesma execução (`run_id`), sem recalcular.
+- `assets/ci/github-actions-drift.yml`: sem cron por padrão (`workflow_dispatch`); cron fica comentado e exige `# justificativa:`.
+- Docs, comandos e DoD (`fluxo.md`, `qualidade.md`, `tf-*`, SKILL, CLAUDE.md, README): "CI no PR" e "trava o merge" viram "trava a promoção"/gate local.
+
+### Adicionado
+- `references/fluxo.md` §1.1 "Identidade da IA" (e piso 7): a IA nunca roda `apply`/`destroy`/`state *` local, nem em hml; pede a operação nomeada ao ops; credencial somente leitura.
+- `scripts/check-ci-triggers.sh` (cópia herdada da engineering) e regra `ci-gatilho` no `check-tf.sh`: reprova push de branch, `pull_request`, cron sem justificativa e workflow sem concurrency cancel true. Testes vermelho->verde (7 casos novos, incluindo os dois templates).
+- Bloco herdado dos pisos 22–29 da `schematize-engineering` em SKILL.md e `assets/CLAUDE.md`.
+
 ## [0.3.0] — 2026-10-14
 Description reduzida para o orçamento de listagem do catálogo; sem mudança de piso.
 
