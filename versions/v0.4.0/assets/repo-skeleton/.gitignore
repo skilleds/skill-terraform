@@ -1,0 +1,16 @@
+# state e plan NUNCA no git (podem conter segredo em claro)
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+tfplan.json
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform/
+# tfvars com valor real: só o *.tfvars sem segredo vai ao git; segredo vem do cofre/CI
+*.auto.tfvars.secret
+# o .terraform.lock.hcl É commitado (nunca ignore)

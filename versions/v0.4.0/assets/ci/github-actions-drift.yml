@@ -1,0 +1,73 @@
+# Drift detection (schematize-terraform). Copie para .github/workflows/terraform-drift.yml.
+# Piso 27: SEM cron por padrão; roda por workflow_dispatch (o ops dispara, ou o usuário pede). Para agendar,
+# descomente o bloco `schedule` abaixo E mantenha a linha `# justificativa:` (custo: 1 plan por ambiente por execução).
+# `plan -detailed-exitcode`: 0 = sem mudança · 2 = DRIFT (o mundo divergiu do código) · 1 = erro.
+# Drift abre issue; o apply de correção segue o fluxo normal (commit no git + tag + plan + aprovação).
+name: terraform-drift
+on:
+  workflow_dispatch:
+  # schedule:
+  #   # justificativa: drift em prd precisa de detecção diária (mudança manual no console é o risco que o plan não vê)
+  #   - cron: "17 6 * * *" # fora da hora cheia
+
+concurrency:
+  group: terraform-drift
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  TF_TOOL: tofu # tofu | terraform  <- a mesma escolha do CI de IaC
+  TOFU_VERSION: "1.13.1"
+  TERRAFORM_VERSION: "1.16.5"
+
+jobs:
+  drift:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [hml, prd]
+    environment: ${{ matrix.env }}-plan # credencial SOMENTE-LEITURA
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+    defaults:
+      run:
+        working-directory: envs/${{ matrix.env }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        if: env.TF_TOOL == 'tofu'
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_wrapper: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        if: env.TF_TOOL == 'terraform'
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+      - name: Credencial (OIDC, somente leitura)
+        run: echo "troque pelo seu cloud"
+      - name: init
+        run: $TF_TOOL init -input=false
+      - name: plan de drift
+        id: plan
+        run: |
+          set +e
+          "$TF_TOOL" plan -input=false -lock=false -refresh=true -var-file="${{ matrix.env }}.tfvars" -detailed-exitcode -no-color > drift.txt
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+      - name: abre issue se houve drift
+        if: steps.plan.outputs.code == '2'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "Drift em ${{ matrix.env }} ($(date -u +%F))" \
+            --label drift \
+            --body "O plan de drift de **${{ matrix.env }}** achou diferença entre o código e o mundo. Veja o log do job; corrija pelo git (a mudança manual vira código ou é revertida pelo apply)."
+      - name: falha se o plan deu erro
+        if: steps.plan.outputs.code == '1'
+        run: cat drift.txt; exit 1

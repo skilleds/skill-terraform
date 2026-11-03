@@ -1,0 +1,23 @@
+# Backend S3-COMPATÍVEL (Hetzner Object Storage, Cloudflare R2, MinIO). As flags skip_* existem
+# porque esses serviços não têm STS/IAM/metadata da AWS.
+# ATENÇÃO: use_lockfile depende de escrita condicional (If-None-Match) no serviço; confirme que o
+# seu provedor suporta antes de confiar no lock <!-- reverificar -->.
+terraform {
+  backend "s3" {
+    bucket = "acme-tfstate-prd"
+    key    = "prd/core.tfstate"
+    region = "auto" # R2 usa "auto"; Hetzner usa a localização (ex.: "fsn1")
+
+    endpoints = {
+      s3 = "https://<conta>.r2.cloudflarestorage.com" # ou https://fsn1.your-objectstorage.com
+    }
+
+    use_lockfile                = true
+    skip_credentials_validation = true
+    skip_requesting_account_id  = true
+    skip_region_validation      = true
+    skip_metadata_api_check     = true
+    skip_s3_checksum            = true
+    use_path_style              = true
+  }
+}

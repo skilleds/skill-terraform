@@ -1,0 +1,15 @@
+# Backend S3 com lock nativo e criptografia. Um arquivo por ambiente (key diferente, de preferência
+# bucket e credencial diferentes para prd). Credencial: OIDC no CI, nunca chave estática no código.
+terraform {
+  backend "s3" {
+    bucket       = "acme-tfstate-prd"
+    key          = "prd/core.tfstate"
+    region       = "us-east-1"
+    encrypt      = true
+    kms_key_id   = "alias/tfstate-prd" # SSE-KMS: quem lê o state precisa de permissão na chave
+    use_lockfile = true                # lock nativo; dynamodb_table está DEPRECADO
+  }
+}
+
+# Bucket (criado por um bootstrap à parte, com state próprio): versionamento ligado, bloqueio de
+# acesso público, política negando acesso sem TLS, MFA-delete ou Object Lock se o risco pedir.

@@ -1,0 +1,12 @@
+slug = "terraform"
+name = "schematize-terraform"
+tag = "Disciplina · IaC (Terraform/OpenTofu)"
+status = "beta"
+order = 40
+current_version = "0.4.0"
+href = "/terraform"
+
+[descriptions]
+pt = "IaC declarativa da casa em Terraform e OpenTofu: raízes por ambiente (workspace não separa prd de hml), state remoto com lock e criptografia, pins e lock multiplataforma, módulos como API, segredo fora do state, plan salvo e apply gated, drift, testes e política como código."
+en = "The house's declarative IaC in Terraform and OpenTofu: per-environment roots (workspaces do not separate prd from hml), remote state with lock and encryption, pins and multi-platform lock file, modules as APIs, secrets kept out of state, saved plan and gated apply, drift, tests and policy as code."
+es = "La IaC declarativa de la casa en Terraform y OpenTofu: raíces por ambiente (workspace no separa prd de hml), state remoto con lock y cifrado, pins y lock multiplataforma, módulos como API, secretos fuera del state, plan guardado y apply con gate, drift, pruebas y política como código."

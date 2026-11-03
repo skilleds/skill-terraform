@@ -1,0 +1,30 @@
+# Criptografia do state e do plan (OpenTofu >= 1.7; NÃO existe no Terraform).
+# O state fica cifrado NO CLIENTE, antes de ir ao backend: vale para qualquer backend, inclusive
+# um bucket que alguém abriu sem querer. Complementa (não substitui) o encrypt do backend.
+terraform {
+  encryption {
+    # Opção A (preferida): chave gerenciada em KMS. Nenhum segredo no código.
+    key_provider "aws_kms" "estado" {
+      kms_key_id = "alias/tofu-state"
+      region     = "us-east-1"
+      key_spec   = "AES_256"
+    }
+
+    # Opção B (sem KMS): passphrase vinda do ambiente. NÃO a escreva aqui; exporte
+    #   TF_ENCRYPTION='key_provider "pbkdf2" "estado" { passphrase = "..." }'
+    # a partir do cofre/secret do CI (>= 16 caracteres, gerada, rotacionada).
+
+    method "aes_gcm" "estado" {
+      keys = key_provider.aws_kms.estado
+    }
+
+    state {
+      method   = method.aes_gcm.estado
+      enforced = true # recusa ler/gravar state em claro
+    }
+    plan {
+      method   = method.aes_gcm.estado
+      enforced = true # o plan salvo como artefato também sai cifrado
+    }
+  }
+}
