@@ -39,14 +39,14 @@ conftest verify --policy policy/                       # a política tem teste
   provider? State cifrado? OpenTofu: `encryption {}` com `enforced`; Terraform: backend com `encrypt` + `kms_key_id` e acesso restrito. Só uma ferramenta no repo?
 - **Módulo:** `validation` rejeita o perigoso? default seguro? saída mínima? versão pinada ao consumir?
 - **Destrutivo:** todo `prevent_destroy` onde há dado? `for_each` com chave estável?
-- **Fluxo:** o CI aplica plan salvo? há *environment* com revisores em prd? alguém consegue
+- **Fluxo:** o CI aplica o plan salvo da mesma execução (nunca plan recalculado)? o gatilho é só dispatch/tag (sem push de branch/PR)? há *environment* com revisores em prd? alguém consegue
   `apply` do laptop em prd?
-- **Drift:** existe plan agendado com credencial somente leitura e destino do alerta?
+- **Drift:** existe plan de drift (sob demanda; cron só com justificativa) com credencial somente leitura e destino do alerta?
 - **Refactor:** `moved`/`import`/`removed` em vez de `state mv`.
 - **Tags/labels** obrigatórias; política (`conftest`) cobrindo o resto.
 - **Efeito externo:** domínio, e-mail ou webhook de hml/dev apontando para o mundo real?
 
 ## 3. Feche
 
-Achado vira correção no mesmo PR ou item de checklist com dono. O vermelho do próprio gate:
+Achado vira correção no mesmo commit ou item de checklist com dono. O vermelho do próprio gate:
 `bash scripts/check-tf.test.sh`.

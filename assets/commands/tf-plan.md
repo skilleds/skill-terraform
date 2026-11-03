@@ -6,7 +6,7 @@ argument-hint: "<envs/ambiente>"
 # /tf-plan — o plan é o contrato; quem aprova leu
 
 Alvo: `envs/${ARGUMENTS}` (ex.: `envs/hml`). **Este comando NÃO aplica.** `apply` é do CI, no
-*environment* protegido, consumindo o plan aprovado (`references/fluxo.md`).
+*environment* protegido, consumindo o plan aprovado, ou de operação nomeada do ops; a IA nunca aplica (`references/fluxo.md`).
 
 1. **Pré-condições:** árvore limpa; credencial **somente leitura** (nunca a de escrita); ferramenta
    e versão iguais às do CI (`required_version`).
@@ -25,7 +25,7 @@ Alvo: `envs/${ARGUMENTS}` (ex.: `envs/hml`). **Este comando NÃO aplica.** `appl
 4. **Leia nesta ordem** e escreva o resumo (`references/fluxo.md` §2):
    - totais: add / change / **destroy**;
    - cada `destroy` e cada `must be replaced`: o que é, tem dado, por que o atributo mudou;
-   - mudanças em recurso que o PR **não** tocou (drift ou bump de provider);
+   - mudanças em recurso que a mudança **não** tocou (drift ou bump de provider);
    - abertura de rede, permissão ampla, remoção de proteção/criptografia;
    - `known after apply` onde não devia; custo se houver `infracost`.
 5. **Entregue** ao humano: resumo + veredito (`SEGURO PARA APROVAR` / `PEDE ATENÇÃO` / `BLOQUEAR`)

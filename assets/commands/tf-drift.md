@@ -1,5 +1,5 @@
 ---
-description: schematize-terraform — detecta e classifica drift (plan -detailed-exitcode) e propõe a resolução em PR; nunca aplica
+description: schematize-terraform — detecta e classifica drift (plan -detailed-exitcode) e propõe a resolução em commit; nunca aplica
 argument-hint: "<envs/ambiente | todos>"
 ---
 
@@ -16,11 +16,11 @@ argument-hint: "<envs/ambiente | todos>"
    `-lock=false` só aqui (leitura; não bloqueia um apply legítimo). Para ver só o que mudou fora do
    código: `$TF plan -refresh-only`.
 3. **Classifique cada diferença** (`references/fluxo.md` §4):
-   - **mudança manual indevida** -> o código está certo: `apply` (por PR/CI) traz o mundo de volta;
-   - **mudança manual legítima** -> vira código (PR) e o drift some;
+   - **mudança manual indevida** -> o código está certo: `apply` (por commit + tag, via CI/ops) traz o mundo de volta;
+   - **mudança manual legítima** -> vira código (commit) e o drift some;
    - **default novo do provider/bump** -> ajuste explícito no código ou `ignore_changes` com motivo;
    - **atributo gerido por outro sistema** -> `ignore_changes` com comentário do porquê;
    - **recurso apagado fora** -> recriar (cuidado com dado) ou `removed` se foi intencional.
-4. **Agendamento:** se não existe, instale `assets/ci/github-actions-drift.yml` (diário, abre issue).
-5. **Entregue** a tabela (recurso | o que mudou | classe | ação | dono). Resolução é PR; este
+4. **Execução:** se não existe, instale `assets/ci/github-actions-drift.yml` (por `workflow_dispatch`, abre issue; cron só com `# justificativa:`).
+5. **Entregue** a tabela (recurso | o que mudou | classe | ação | dono). Resolução é commit no git; este
    comando não aplica. Drift que ninguém corrige em prazo vira item de checklist com dono.

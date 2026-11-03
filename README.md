@@ -3,7 +3,7 @@
 > **O state é a memória da infra e o plan é o contrato.** IaC declarativa em **OpenTofu e
 > Terraform**, em paridade (uma ferramenta por repo, escolhida por critério objetivo): raízes por ambiente, state remoto com lock e
 > criptografia, providers e lock file fixados, módulos como API, segredo fora do state, plan salvo
-> com apply gated, drift agendado, testes e política como código.
+> com apply gated, drift sob demanda, testes e política como código.
 
 Pacote de **skill normativa para [Claude Code](https://claude.com/claude-code)**.
 Parte do catálogo **schematize skills**.

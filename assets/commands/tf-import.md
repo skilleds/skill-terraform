@@ -5,7 +5,7 @@ argument-hint: "<tipo.nome> [id-real]"
 
 # /tf-import — adotar e refatorar sem tocar no state à mão
 
-`state mv`, `state rm` e `import` por linha de comando não passam por PR nem deixam trilha. Use os
+`state mv`, `state rm` e `import` por linha de comando não passam pelo git nem deixam trilha. Use os
 blocos (`references/fluxo.md` §5).
 
 1. **Qual é o caso?**
@@ -17,7 +17,7 @@ blocos (`references/fluxo.md` §5).
    conter segredo) antes de incorporar.
 3. **Plan:** `$TF plan -out=plano.tfplan` deve mostrar `will be imported` / `has moved` /
    `will be removed from state` e **zero destroy, zero replace**. Qualquer destroy: pare e entenda.
-4. **PR com o plan** (`/tf-plan`), revisão, apply pelo CI.
+4. **Commit com o plan** (`/tf-plan`), revisão, apply pelo CI/ops.
 5. **Depois:** mantenha `moved` por um ciclo de releases se o módulo é compartilhado; remova
    `import` e `removed` depois de aplicados. Rode `check-tf.sh` e confirme `plan` vazio.
 6. Recurso adotado com dado: já entra com `prevent_destroy` e a proteção do provedor.

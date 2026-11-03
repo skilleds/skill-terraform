@@ -4,9 +4,9 @@
 
 > Cada degrau pega uma classe diferente de erro. Nenhum substitui a leitura do `plan`.
 
-## 1. Os degraus (ordem do CI)
+## 1. Os degraus (ordem; por commit, local; no CI remoto só na promoção)
 
-| # | Ferramenta | Pega | Precisa de credencial? | Trava o merge? |
+| # | Ferramenta | Pega | Precisa de credencial? | Trava a promoção? |
 |---|---|---|---|---|
 | 1 | `$TF fmt -check -recursive` | estilo | não | sim |
 | 2 | `$TF init -backend=false && $TF validate` | sintaxe, tipos, referências | não | sim |
@@ -20,7 +20,7 @@
 ## 2. fmt, validate e tflint
 
 - `fmt` sem opinião: o formato é o da ferramenta. Pre-commit local e `-check` no CI.
-- `validate` roda **sem backend e sem credencial** (`init -backend=false`), então vale em PR de fork.
+- `validate` roda **sem backend e sem credencial** (`init -backend=false`), então roda sem segredo.
 - `tflint` com a config da casa: `assets/lint/.tflint.hcl` (naming snake_case, variável/saída
   documentada, módulo com pin, `required_version`, declarações não usadas). Plugin do provider
   (AWS, etc.) fixado por versão. Com `--recursive`, passe `--config` com **caminho absoluto**.
@@ -61,7 +61,7 @@ Muito `validate`/estático e teste de módulo com mock; pouco teste real e caro.
   Trivy). Útil se a casa já usa Trivy para imagens (`schematize-docker → scan`).
 - Use **um** como gate e o outro, se quiser, como informativo. Exceção sem motivo escrito é dívida.
 - Achado de segurança que depende de contexto (SG aberto de propósito num LB público) vira
-  `skip` **com justificativa**, revisada no PR.
+  `skip` **com justificativa**, revisada no commit.
 
 ## 5. Política como código (OPA/conftest)
 
@@ -80,10 +80,10 @@ sem teste é regra que ninguém sabe se funciona.
 
 ## 6. Custo (opcional)
 
-`infracost breakdown --path=. ` / `infracost diff` no PR comenta o delta mensal. Defina
+`infracost breakdown --path=. ` / `infracost diff` na promoção comenta o delta mensal. Defina
 limiar: acima de X por mês a mudança exige aprovação financeira. Limite: só cobre provedores
 que o Infracost precifica (AWS/Azure/GCP; Hetzner e Cloudflare não por padrão) <!-- reverificar -->;
-para os demais, estime por tabela do provedor no PR.
+para os demais, estime por tabela do provedor no commit.
 
 ## 7. Tags e labels obrigatórias
 

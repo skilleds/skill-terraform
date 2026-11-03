@@ -66,7 +66,7 @@ plataforma.
 | `/tf-review` | revisa o repo IaC: roda o gate, `fmt`/`validate`/`tflint` quando houver e lê o que a máquina não lê |
 | `/tf-plan` | o rito de plan: gera o plan salvo, lê na ordem certa e prepara a revisão humana. Nunca aplica |
 | `/tf-module` | cria um módulo no contrato da casa (variáveis com `validation`, saídas, `versions.tf` sem provider, teste) |
-| `/tf-drift` | detecta e classifica drift (`plan -detailed-exitcode`) e propõe a resolução em PR |
+| `/tf-drift` | detecta e classifica drift (`plan -detailed-exitcode`) e propõe a resolução em commit |
 | `/tf-import` | adota recurso existente com bloco `import` / `moved` / `removed`, sem `state mv` à mão |
 | `/tf-claude` | cria/mescla o `CLAUDE.md` sempre-on de IaC na raiz do repo |
 | `/tf-cc` · `/tf-handoff` | context compact / handoff arquivado |
@@ -122,19 +122,23 @@ reais) · `assets/repo-skeleton-terraform/` (locks do registry do Terraform) · 
    `sensitive`; **nunca `provider {}` dentro de módulo filho**; versão pinada ao consumir.
 6. **Segredo nunca em `.tf`, `.tfvars` ou `default`.** Prefira o que não entra no state
    (`ephemeral` + `*_wo`, cofre lido em runtime); o que entrar, com state cifrado e acesso mínimo.
-7. **plan salvo -> revisão humana -> apply só desse plan.** Apply de prd só pelo CI, no
-   *environment* protegido; **nunca `apply` local em prd**.
+7. **plan salvo -> revisão humana -> apply só desse plan** (o artefato da mesma execução do CI).
+   Apply de prd só pelo CI, no *environment* protegido; **nunca `apply` local em prd**. **A IA nunca
+   roda `apply`/`destroy`/`state *` local (nem em hml): pede a operação nomeada ao ops** (`references/fluxo.md` §1.1).
+   CI só em `workflow_dispatch` + tags `hml-*`/`v*`, nunca por commit/PR, nunca apply em push de branch (piso 27).
 8. **Recurso com dado leva `prevent_destroy`** (e a proteção do provedor); `count` sobre recurso
    com estado é vetado — use `for_each` com chave estável.
 9. **Refatorar com `moved`/`import`/`removed`**, não com `state mv/rm` à mão.
-10. **Drift se detecta por agenda** (`plan -detailed-exitcode`) e se resolve por PR, nunca por
-    convivência.
+10. **Drift se detecta** (`plan -detailed-exitcode`, sob demanda; cron só com `# justificativa:`) e se
+    resolve por commit no git, nunca por convivência.
 11. **Tags/labels obrigatórias** (`env`, `owner`, `project`, `managed_by`) em tudo que aceita,
     validadas no módulo e na política do plan.
 12. **Qualidade em degraus que travam:** `fmt`, `validate`, `check-tf.sh`, `tflint`, `checkov`/`trivy`,
-    `$TF test`, `conftest` — nesta ordem, no CI. Exceção só com motivo escrito.
+    `$TF test`, `conftest` — nesta ordem: por commit, local (pre-commit/`tools/ci.sh`); no CI remoto, uma vez antes de promover a hml. Exceção só com motivo escrito. `check-tf.sh` também roda `check-ci-triggers.sh` sobre os workflows.
 13. **Efeito externo nunca sai de não-produção** também em IaC (`schematize-infra → references/iac-efeitos-externos.md`).
 14. <!-- herdado:engineering/orquestracao:curto -->**Orquestrador não desenvolve; subagent barato executa.** O agent principal só planeja, despacha e revisa; ação onerosa vira micro-tasks para o executor mais barato que resolve: `haiku` (mecânico) / `sonnet` (código; falhou → mesmo subagent corrige, até 2 rodadas) → Codex `gpt-5.6-terra` → Cursor → subagent `opus` (motivo) → `park`; **visual vai direto ao Codex**; **imagem nunca pelo Claude: detectar Codex/Gemini e perguntar ao usuário qual usar (Codex é a sugestão), nunca API de imagem paga**; papéis em `agentes.toml`. No overdev, cada item do checklist vai a um subagent e o principal revisa antes do `- [x]`. **Sem frota ociosa:** idle com pendência volta ao trabalho; dependente de outro agent → mata e enfileira com gatilho; terminou → mata (§9.6). Detalhe: `schematize-engineering` → `references/orquestracao.md` §9.<!-- /herdado -->
+
+Herda os pisos 22–29 da `schematize-engineering` (git como trava de conclusão, deploy só do git, ops é o gate da IA, sem agents inúteis, relatório 30 min/handoff 6 h, CI remoto só antes do hml, microserviço autônomo, build em dev/hml + higiene).
 
 ## Regra de mídia
 
