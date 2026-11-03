@@ -1,11 +1,18 @@
-# Drift detection agendada (schematize-terraform). Copie para .github/workflows/terraform-drift.yml.
+# Drift detection (schematize-terraform). Copie para .github/workflows/terraform-drift.yml.
+# Piso 27: SEM cron por padrão; roda por workflow_dispatch (o ops dispara, ou o usuário pede). Para agendar,
+# descomente o bloco `schedule` abaixo E mantenha a linha `# justificativa:` (custo: 1 plan por ambiente por execução).
 # `plan -detailed-exitcode`: 0 = sem mudança · 2 = DRIFT (o mundo divergiu do código) · 1 = erro.
-# Drift abre issue; o apply de correção segue o fluxo normal (PR + plan + aprovação).
+# Drift abre issue; o apply de correção segue o fluxo normal (commit no git + tag + plan + aprovação).
 name: terraform-drift
 on:
-  schedule:
-    - cron: "17 6 * * *" # diário, fora da hora cheia
   workflow_dispatch:
+  # schedule:
+  #   # justificativa: drift em prd precisa de detecção diária (mudança manual no console é o risco que o plan não vê)
+  #   - cron: "17 6 * * *" # fora da hora cheia
+
+concurrency:
+  group: terraform-drift
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -60,7 +67,7 @@ jobs:
           gh issue create --repo "$GITHUB_REPOSITORY" \
             --title "Drift em ${{ matrix.env }} ($(date -u +%F))" \
             --label drift \
-            --body "O plan agendado de **${{ matrix.env }}** achou diferença entre o código e o mundo. Veja o log do job; corrija por PR (a mudança manual vira código ou é revertida pelo apply)."
+            --body "O plan de drift de **${{ matrix.env }}** achou diferença entre o código e o mundo. Veja o log do job; corrija pelo git (a mudança manual vira código ou é revertida pelo apply)."
       - name: falha se o plan deu erro
         if: steps.plan.outputs.code == '1'
         run: cat drift.txt; exit 1

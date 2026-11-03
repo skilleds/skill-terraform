@@ -1,39 +1,80 @@
 # CI de IaC (schematize-terraform). Copie para .github/workflows/terraform.yml.
-# Fluxo: qualidade -> plan salvo como artefato (por ambiente) -> apply GATED só do plan aprovado.
+# Piso 27 (engineering): CI remoto NÃO roda por commit nem por PR. O gate por commit é LOCAL
+# (`bash tools/check-tf.sh .`, fmt, validate, tflint no pre-commit/`tools/ci.sh`). Este workflow roda UMA vez
+# por promoção: `git tag hml-<data>` (promove a hml) ou `git tag v<semver>` (promove a prd), ou
+# `workflow_dispatch` quando o usuário/ops pedir. NUNCA há apply em push de branch.
+# Fluxo: qualidade -> plan salvo (artefato DESTA execução) -> apply GATED do MESMO artefato.
+#   hml-*  -> plan+apply de hml     v*  -> plan+apply de prd (hml já foi promovido pela tag hml-*)
+#   dispatch -> input `ambiente` (hml | prd)
+# Plan revisado = plan aplicado: o job apply baixa o artefato gerado por esta mesma execução
+# (run_id), o revisor lê o plan no resumo do job de plan e aprova no environment; o apply consome
+# esse arquivo (state mudou entre os dois = a ferramenta recusa o plan obsoleto).
 # Pré-requisitos no GitHub (Settings > Environments):
 #   - "hml-plan" e "prd-plan": secrets/OIDC SOMENTE-LEITURA (plan não escreve nada).
 #   - "hml" e "prd": credencial de ESCRITA + "Required reviewers" (prd: 2 pessoas, sem auto-aprovação)
-#     + "Deployment branches: main". É essa proteção que impede apply sem humano.
+#     + "Deployment branches and tags": só `main`, `hml-*` e `v*`. É a aprovação que impede apply sem humano.
 # Autenticação: OIDC (id-token: write), nunca chave estática. Ajuste o passo "Credencial".
 # Ferramenta: OpenTofu e Terraform têm paridade. UMA escolha por repo, num lugar só: TF_TOOL abaixo
 # (tofu | terraform), a mesma do README/ADR do projeto. Os dois passos de setup têm `if:`; todos os
 # comandos usam "$TF_TOOL". O gate check-tf.sh lê TF_TOOL para saber qual ramo de regras aplicar.
 name: terraform
 on:
-  pull_request:
-    paths: ["envs/**", "modules/**", ".github/workflows/terraform.yml", ".tflint.hcl", "policy/**"]
-  push:
-    branches: [main]
-    paths: ["envs/**", "modules/**"]
   workflow_dispatch:
+    inputs:
+      ambiente:
+        description: "Ambiente a promover"
+        type: choice
+        options: [hml, prd]
+        default: hml
+  push:
+    tags: ["hml-*", "v*"]
+    # paths-ignore não vale para tags; docs/md não disparam nada porque ninguém tagueia por doc.
 
 concurrency:
-  # Um pipeline por ambiente por vez; apply nunca é cancelado no meio (corrompe o state).
+  # Uma execução por ref: re-disparo na mesma ref cancela a anterior (cancel-in-progress: true, piso 27).
+  # O apply recebe SIGINT e a ferramenta para de forma graciosa e solta o lock do state; por isso o
+  # apply tem concurrency próprio por ambiente (abaixo) para nunca haver dois applies no mesmo state.
   group: terraform-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 env:
   TF_TOOL: tofu # tofu | terraform  <- a escolha do repo (lock file e backend têm de bater)
-  TOFU_VERSION: "1.13.1" # igual ao required_version dos envs; suba em PR próprio
+  TOFU_VERSION: "1.13.1" # igual ao required_version dos envs; suba em commit próprio
   TERRAFORM_VERSION: "1.16.5"
   CHECKOV_VERSION: "3.3.29"
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
 
 jobs:
+  alvo:
+    # Decide o ambiente pela tag/input. Nunca interpola ref/input direto no shell (injeção): vai por env.
+    runs-on: ubuntu-24.04
+    outputs:
+      envs: ${{ steps.d.outputs.envs }}
+      hml: ${{ steps.d.outputs.hml }}
+      prd: ${{ steps.d.outputs.prd }}
+    steps:
+      - id: d
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          INPUT_ENV: ${{ inputs.ambiente }}
+        run: |
+          set -euo pipefail
+          alvo=""
+          if [ "$REF_TYPE" = tag ]; then
+            case "$REF_NAME" in hml-*) alvo=hml ;; v*) alvo=prd ;; esac
+          else
+            alvo="$INPUT_ENV"
+          fi
+          case "$alvo" in hml|prd) ;; *) echo "ambiente não resolvido (ref=$REF_NAME)"; exit 1 ;; esac
+          echo "envs=[\"$alvo\"]" >> "$GITHUB_OUTPUT"
+          echo "hml=$([ "$alvo" = hml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "prd=$([ "$alvo" = prd ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
   qualidade:
     runs-on: ubuntu-24.04
     steps:
@@ -72,17 +113,16 @@ jobs:
           done
 
   plan:
-    needs: qualidade
+    needs: [alvo, qualidade]
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        env: [hml, prd]
+        env: ${{ fromJSON(needs.alvo.outputs.envs) }}
     environment: ${{ matrix.env }}-plan
     permissions:
       contents: read
       id-token: write # OIDC
-      pull-requests: write # comentário com o resumo do plan
     defaults:
       run:
         working-directory: envs/${{ matrix.env }}
@@ -116,16 +156,21 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           # o plan pode conter segredo: retenção curta; com OpenTofu, encryption.plan (enforced); com Terraform, repo privado e acesso mínimo ao artefato
-          name: plano-${{ matrix.env }}-${{ github.sha }}
+          name: plano-${{ matrix.env }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: envs/${{ matrix.env }}/plano.tfplan
           retention-days: 7
           if-no-files-found: error
 
   apply-hml:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: plan
+    if: needs.alvo.outputs.hml == 'true'
+    needs: [alvo, plan]
     runs-on: ubuntu-24.04
-    environment: hml # proteção: branch main
+    # Gate humano: Required reviewers no environment hml. Leia o plan no resumo do job `plan` antes de aprovar.
+    environment: hml
+    concurrency:
+      # cancel-in-progress: false de propósito (só aqui): applies do mesmo state se enfileiram, nunca se cancelam no meio.
+      group: terraform-apply-hml
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
@@ -146,7 +191,7 @@ jobs:
           terraform_wrapper: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: plano-hml-${{ github.sha }}
+          name: plano-hml-${{ github.run_id }}-${{ github.run_attempt }}
           path: envs/hml
       - name: Credencial (OIDC, escrita)
         run: echo "troque pelo seu cloud"
@@ -156,10 +201,14 @@ jobs:
         run: $TF_TOOL apply -input=false -lock-timeout=5m plano.tfplan
 
   apply-prd:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: apply-hml # prd só depois de hml verde
+    if: needs.alvo.outputs.prd == 'true'
+    needs: [alvo, plan] # hml foi promovido antes, pela tag hml-* (mesmo commit)
     runs-on: ubuntu-24.04
-    environment: prd # Required reviewers (2) + só a branch main: o gate humano
+    environment: prd # Required reviewers (2, sem auto-aprovação): o gate humano
+    concurrency:
+      # cancel-in-progress: false de propósito (só aqui): um apply por vez no state de prd.
+      group: terraform-apply-prd
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
@@ -180,7 +229,7 @@ jobs:
           terraform_wrapper: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: plano-prd-${{ github.sha }}
+          name: plano-prd-${{ github.run_id }}-${{ github.run_attempt }}
           path: envs/prd
       - name: Credencial (OIDC, escrita)
         run: echo "troque pelo seu cloud"
