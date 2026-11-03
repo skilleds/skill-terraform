@@ -3,7 +3,7 @@
 Todas as mudanças relevantes deste pacote, no formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 com versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
-## [Não lançado]
+## [0.4.0] — 2026-11-03
 
 ### Corrigido
 - CI de IaC (piso 27): `assets/ci/github-actions-terraform.yml` deixa de usar `pull_request` e `push` em branch; gatilho `workflow_dispatch` + `push: tags [hml-*, v*]`, `concurrency` com `cancel-in-progress: true` (apply com concurrency próprio por ambiente, `false` justificado), `apply-hml`/`apply-prd` só atrás de `environment` com aprovação, nunca em push de branch. Job `alvo` resolve o ambiente pela tag/input sem interpolar no shell.
